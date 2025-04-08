@@ -68,22 +68,28 @@ if page == "Temporal Analysis":
             st.plotly_chart(fig_time)
 
 # 2. Spatial Analysis
-elif page == "Spatial Analysis":
+
+if page == "Spatial Analysis":
     st.title("📍 Spatial Analysis")
 
-    if "location_type" in df_filtered.columns:
-        st.subheader("Species Distribution by Location Type")
-        location_species = df_filtered.groupby("location_type")["scientific_name"].nunique().reset_index()
-        location_species.columns = ["Location Type", "Unique Species"]
-        fig_loc = px.bar(location_species, x="Location Type", y="Unique Species", color="Location Type", title="Unique Species per Location Type")
-        st.plotly_chart(fig_loc)
-
+    # Most bird sightings by plot
     if "plot_name" in df_filtered.columns:
-        st.subheader("Observations by Plot")
-        plot_species = df_filtered.groupby("plot_name")["scientific_name"].nunique().reset_index().sort_values(by="scientific_name", ascending=False)
-        plot_species.columns = ["Plot Name", "Unique Species"]
-        fig_plot = px.bar(plot_species.head(20), x="Plot Name", y="Unique Species", title="Top 20 Plots by Species Count")
-        st.plotly_chart(fig_plot)
+        st.subheader("Most Active Plots by Total Sightings")
+        plot_counts = df_filtered["plot_name"].value_counts().reset_index()
+        plot_counts.columns = ["Plot Name", "Sightings"]
+        fig_plot_sightings = px.bar(plot_counts.head(20), x="Plot Name", y="Sightings",
+                                    title="Top 20 Plots by Total Bird Sightings")
+        st.plotly_chart(fig_plot_sightings)
+
+
+    # Species distribution by location type
+    st.subheader("Species Frequency Heatmap by Location Type")
+    location_dist = df_filtered.groupby(["scientific_name", "location_type"]).size().reset_index(name="count")
+    pivot_table = location_dist.pivot(index="scientific_name", columns="location_type", values="count").fillna(0)
+    fig_heatmap = px.imshow( pivot_table,
+    labels=dict(x="Location Type", y="Species", color="Observation Count"),
+    title="Species Heatmap Across Location Types")
+    st.plotly_chart(fig_heatmap)
 
 # 3. Species Analysis
 elif page == "Species Analysis":
@@ -97,8 +103,8 @@ elif page == "Species Analysis":
         st.plotly_chart(fig_div)
 
     st.subheader("Common Activities")
-    if "interval_length" in df_filtered.columns and "id_method" in df_filtered.columns:
-        activity_counts = df_filtered.groupby("id_method")["interval_length"].count().reset_index()
+    if "id_method" in df_filtered.columns:
+        activity_counts = df_filtered["id_method"].value_counts().reset_index()
         activity_counts.columns = ["Identification Method", "Count"]
         fig_act = px.pie(activity_counts, names="Identification Method", values="Count", title="Activity Types (via ID Method)")
         st.plotly_chart(fig_act)
@@ -241,22 +247,6 @@ elif page == "Other Insights":
         seasonal_hotspot = df_filtered.groupby(["season", "scientific_name"]).size().reset_index(name="count")
         fig_hot = px.scatter(seasonal_hotspot, x="season", y="scientific_name", size="count", color="season", title="Species Activity Across Seasons")
         st.plotly_chart(fig_hot)
-
-    st.subheader("Environmental Influence on Behavior")
-    if "temperature" in df_filtered.columns and "interval_length" in df_filtered.columns:
-        df_behavior = df_filtered.dropna(subset=["temperature", "interval_length"])
-
-        if df_behavior["temperature"].dropna().empty or df_behavior["interval_length"].dropna().empty:
-            st.warning("Not enough valid data for plotting temperature vs activity length.")
-        else:
-            fig_env = px.scatter(
-                df_behavior,
-                x="temperature",
-                y="interval_length",
-                trendline="ols",
-                title="Effect of Temperature on Activity Length"
-            )
-            st.plotly_chart(fig_env)
 
     st.subheader("Conservation Focus: Species at Risk")
     if "scientific_name" in df_filtered.columns and "pif_watchlist_status" in df_filtered.columns:
